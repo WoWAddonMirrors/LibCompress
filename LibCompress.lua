@@ -8,7 +8,7 @@
 ----------------------------------------------------------------------------------
 
 
-local MAJOR, MINOR = "LibCompress", 3
+local MAJOR, MINOR = "LibCompress", 4
 	
 local LibCompress,oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
@@ -259,7 +259,10 @@ function LibCompress:CompressHuffman(uncompressed)
 	if not type(uncompressed)=="string" then
 		return nil, "Can only compress strings"
 	end
-
+	if #uncompressed == 0 then
+		return "\001"
+	end
+	
 	-- make histogram
 	local hist = {}
 	local n = 0
@@ -578,6 +581,7 @@ function LibCompress:DecompressHuffman(compressed)
 	local dec_size = 0;
 	compressed_size = compressed_size + 1
 	local temp_limit = 200; -- first limit of uncompressed data. large_uncompressed will hold strings of length 200
+	temp_limit = temp_limit > orig_size and orig_size or temp_limit
 	while true do
 		if test_code_len<=bitfield_len then 
 			test_code=bit_band( bitfield, lshiftMinusOneMask[test_code_len])
@@ -610,12 +614,10 @@ function LibCompress:DecompressHuffman(compressed)
 			c = string_byte(compressed, i)
 			bitfield = bitfield + bit_lshift(c or 0, bitfield_len)
 			bitfield_len = bitfield_len + 8
-			i = i + 1
-			if i > temp_limit then
-				if i > compressed_size then
-					break;
-				end
+			if i > compressed_size then
+				break;
 			end
+			i = i + 1
 		end
 	end
 
