@@ -8,7 +8,7 @@
 ----------------------------------------------------------------------------------
 
 
-local MAJOR, MINOR = "LibCompress", 4
+local MAJOR, MINOR = "LibCompress", 5
 	
 local LibCompress,oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
@@ -74,6 +74,10 @@ local function setCleanupTables(...)
 	end
 end
 
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+--
+-- compression algorithms
 
 --------------------------------------------------------------------------------
 -- LZW codec
@@ -672,4 +676,280 @@ function LibCompress:Decompress(data)
 	else
 		return nil, "Unknown compression method ("..tostring(header_info)..")"
 	end
+end
+
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+--
+-- Encoding algorithms
+
+--------------------------------------------------------------------------------
+-- Prefix encoding algorithm
+-- implemented by Galmok of European Stormrage (Horde), galmok@gmail.com
+
+--[[
+	Howto: Encode and Decode:
+
+	3 functions are supplied, 2 of them are variants of the first.  They return a table with functions to encode and decode text.
+	
+	table, msg = LibCompress:GetEncodeTable(reservedChars, escapeChars,  mapChars)
+	
+		reservedChars: The characters in this string will not appear in the encoded data.
+		escapeChars: A string of characters used as escape-characters (don't supply more than needed). #escapeChars >= 1
+		mapChars: First characters in reservedChars maps to first characters in mapChars.  (#mapChars <= #reservedChars)
+	
+	return value:
+		table
+			if nil then msg holds an error message, otherwise use like this:
+	
+			encoded_message = table:Encode(message)
+			message = table:Decode(encoded_message)
+			
+	GetAddonEncodeTable: Sets up encoding for the addon channel (\000 is encoded)
+	GetChatEncodeTable: Sets up encoding for the chat channel (many bytes encoded, see the function for details)
+	
+	Except for the mapped characters, all encoding will be with 1 escape character followed by 1 suffix, i.e. 2 bytes.
+]]
+-- to be able to match any requested byte value, the search string must be preprocessed
+-- characters to escape with %:
+-- ( ) . % + - * ? [ ] ^ $
+-- "illegal" byte values: 
+-- 0 is replaces %z
+local gsub_escape_table = {
+	['\000'] = "%z",
+	[('(')] = "%(",
+	[(')')] = "%)",
+	[('.')] = "%.",
+	[('%')] = "%%",
+	[('+')] = "%+",
+	[('-')] = "%-",
+	[('*')] = "%*",
+	[('?')] = "%?",
+	[('[')] = "%[",
+	[(']')] = "%]",
+	[('^')] = "%^",
+	[('$')] = "%$"
+}
+
+local function escape_for_gsub(str)
+	return str:gsub("([%z%(%)%.%%%+%-%*%?%[%]%^%$])",  gsub_escape_table)
+end
+
+function LibCompress:GetEncodeTable(reservedChars, escapeChars, mapChars)
+	reservedChars = reservedChars or ""
+	escapeChars = escapeChars or ""
+	mapChars = mapChars or ""
+	
+	-- select a default escape character
+	if escapeChars == "" then
+		return nil, "No escape characters supplied"
+	end
+	
+	if #reservedChars < #mapChars then
+		return nil, "Number of reserved characters must be at least as many as the number of mapped chars"
+	end
+	
+	if reservedChars == "" then
+		return nil, "No characters to encode"
+	end
+	
+	-- list of characters that must be encoded
+	encodeBytes = reservedChars..escapeChars..mapChars
+	
+	-- build list of bytes not available as a suffix to a prefix byte
+	local taken = {}
+	for i=1, strlen(encodeBytes) do 
+		taken[string.sub(encodeBytes, i, i)] = true
+	end
+	
+	-- allocate a table to holde encode/decode strings/functions
+	local codecTable = {}
+	
+	-- the encoding can be a single gsub, but the decoding can require multiple gsubs
+	local decode_func_string = {}
+	
+	local encode_search = {}
+	local encode_translate = {}
+	local decode_search = {}
+	local decode_translate = {}
+	local c,r,i,to,from
+	local escapeCharIndex = 0
+	
+	-- map single byte to single byte
+	if #mapChars > 0 then
+		for i=1, #mapChars do
+			from = string.sub(reservedChars, i, i)
+			to = string.sub(mapChars, i, i)
+			encode_translate[from] = to
+			table.insert(encode_search, from)
+			decode_translate[to] = from
+			table.insert(decode_search, to)
+		end
+		codecTable["decode_search"..tostring(escapeCharIndex)] = "([".. escape_for_gsub(table.concat(decode_search)).."])"
+		codecTable["decode_translate"..tostring(escapeCharIndex)] = decode_translate
+		tinsert(decode_func_string, "str = str:gsub(self.decode_search"..tostring(escapeCharIndex)..", self.decode_translate"..tostring(escapeCharIndex)..");")
+
+	end
+	
+	-- map single byte to double-byte
+	escapeCharIndex = escapeCharIndex +1
+	escapeChar = string.sub(escapeChars, escapeCharIndex, escapeCharIndex)
+	r = 0 -- suffix char value to the escapeChar
+	decode_search = {}
+	decode_translate = {}
+	for i = 1, strlen(encodeBytes) do
+		c = string.sub(encodeBytes, i, i)
+		if not encode_translate[c] then
+			-- this loop will update escapeChar and r
+			while r<256 and taken[string.char(r)] do
+				r=r+1
+				if r>255 then -- switch to next escapeChar
+					if escapeChar == "" then -- we are out of escape chars and we need more!
+						return nil, "Out of escape characters"
+					end
+					
+					codecTable["decode_search"..tostring(escapeCharIndex)] = escape_for_gsub(escapeChar).."([".. escape_for_gsub(table.concat(decode_search)).."])"
+					codecTable["decode_translate"..tostring(escapeCharIndex)] = decode_translate
+					tinsert(decode_func_string, "str = str:gsub(self.decode_search"..tostring(escapeCharIndex)..", self.decode_translate"..tostring(escapeCharIndex)..");")
+					
+					escapeCharIndex  = escapeCharIndex + 1
+					escapeChar = string.sub(escapeChars, escapeCharIndex, escapeCharIndex)
+					
+					r = 0
+					decode_search = {}
+					decode_translate = {}
+				end
+			end
+			encode_translate[c] = escapeChar..string.char(r)
+			table.insert(encode_search, c)
+			decode_translate[string.char(r)] = c
+			table.insert(decode_search, string.char(r))
+			r = r + 1
+		end
+	end
+	if r>0 then
+		codecTable["decode_search"..tostring(escapeCharIndex)] = escape_for_gsub(escapeChar).."([".. escape_for_gsub(table.concat(decode_search)).."])"
+		codecTable["decode_translate"..tostring(escapeCharIndex)] = decode_translate
+		tinsert(decode_func_string, "str = str:gsub(self.decode_search"..tostring(escapeCharIndex)..", self.decode_translate"..tostring(escapeCharIndex)..");")
+	end
+	
+	-- change last line from "str = ...;" to "return ...;";
+	decode_func_string[#decode_func_string] = decode_func_string[#decode_func_string]:gsub("str = (.*);", "return %1;");
+	decode_func_string = "return function(self, str) "..table.concat(decode_func_string).." end"
+	
+	encode_search = "([".. escape_for_gsub(table.concat(encode_search)).."])"
+	decode_search = escape_for_gsub(escapeChars).."([".. escape_for_gsub(table.concat(decode_search)).."])"
+	
+	encode_func = assert(loadstring("return function(self, str) return str:gsub(self.encode_search, self.encode_translate); end"))()
+	decode_func = assert(loadstring(decode_func_string))()
+	
+	codecTable.encode_search = encode_search
+	codecTable.encode_translate = encode_translate
+	codecTable.Encode = encode_func
+	codecTable.decode_search = decode_search
+	codecTable.decode_translate = decode_translate
+	codecTable.Decode = decode_func
+
+	codecTable.decode_func_string = decode_func_string -- to be deleted
+	return codecTable
+end
+
+-- Addons: Call this only once and reuse the returned table for all encodings/decodings. 
+function LibCompress:GetAddonEncodeTable(reservedChars, escapeChars, mapChars )
+	reservedChars = reservedChars or ""
+	escapeChars = escapeChars or ""
+	mapChars = mapChars or ""
+	-- Following byte values are not allowed:
+	-- \000
+	if escapeChars == "" then
+		escapeChars = "\001"
+	end
+	return self:GetEncodeTable( (reservedChars or "").."\000", escapeChars, mapChars)
+end
+
+-- Addons: Call this only once and reuse the returned table for all encodings/decodings.
+function LibCompress:GetChatEncodeTable(reservedChars, escapeChars, mapChars)
+	reservedChars = reservedChars or ""
+	escapeChars = escapeChars or ""
+	mapChars = mapChars or ""
+	-- Following byte values are not allowed:
+	-- \000, s, S, \010, \013, \124, %
+	-- Because SendChatMessage will error if an UTF8 multibyte character is incomplete,
+	-- all character values above 127 have to be encoded to avoid this. This costs quite a bit of bandwidth (about 13-14%)
+	-- Also, because drunken status is unknown for the received, strings used with SendChatMessage should be terminated with
+	-- an identifying byte value, after which the server MAY add "...hic!" or as much as it can fit(!). 
+	-- Pass the identifying byte as a reserved character to this function to ensure the encoding doesn't contain that value.
+	--  or use this: local message, match = arg1:gsub("^(.*)\029.-$", "%1")
+	--  arg1 is message from channel, \029 is the string terminator, but may be used in the encoded datastream as well. :-)
+	-- This encoding will expand data anywhere from:
+	-- 0% (average with pure ascii text)
+	-- 53.5% (average with random data valued zero to 255) 
+	-- 100% (only encoding data that encodes to two bytes)
+	local i
+	local r={}
+	for i=128, 255 do
+		table.insert(r, string.char(i))
+	end
+	reservedChars = "sS\000\010\013\124%"..table.concat(r)..(reservedChars or "")
+	if escapeChars == "" then
+		escapeChars = "\029\031"
+	end
+	if mapChars == "" then
+		mapChars = "\015\020";
+	end
+	return self:GetEncodeTable(reservedChars, escapeChars, mapChars)
+end
+
+--------------------------------------------------------------------------------
+-- 7 bit encoding algorithm
+-- implemented by Galmok of European Stormrage (Horde), galmok@gmail.com
+
+-- The encoded data holds values from 0 to 127 inclusive. Additional encoding may be necessary.
+-- This algorithm isn't exactly fast and be used with care and consideration
+function LibCompress:Encode7bit(str)
+	local compressed_size = 0
+	local remainder = 0;
+	local remainder_length = 0;
+	local tbl = {}
+	local l=#str
+	--local function addBits(tbl, code, len)
+	for i=1,l do
+		code = string.byte(str, i)
+		remainder = remainder + bit_lshift(code, remainder_length)
+		remainder_length = 8 + remainder_length
+		while remainder_length>=7 do
+			compressed_size = compressed_size + 1
+			tbl[compressed_size] = string_char(bit_band(remainder, 127))
+			remainder = bit_rshift(remainder, 7)
+			remainder_length = remainder_length -7
+		end
+	end
+	if remainder_length>0 then
+		table.insert(tbl, string_char(remainder))
+	end
+	return table.concat(tbl)
+end
+
+function LibCompress:Decode7bit(str)
+	local bit8 = {}
+	local ch
+	local i=1
+	local bitfield_len=0
+	local bitfield=0
+	local l=#str
+	while true do
+		if bitfield_len >=8 then
+			table.insert(bit8, string_char(bit.band(bitfield, 255)))
+			bitfield = bit_rshift(bitfield, 8)
+			bitfield_len = bitfield_len - 8
+		end
+		ch=string_byte(str,i)
+		bitfield=bitfield+bit_lshift(ch or 0, bitfield_len)
+		bitfield_len = bitfield_len + 7
+		if i > l then
+			break
+		end
+		i=i+1
+	end
+	return table.concat(bit8)
 end
