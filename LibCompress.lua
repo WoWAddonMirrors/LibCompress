@@ -8,7 +8,7 @@
 ----------------------------------------------------------------------------------
 
 
-local MAJOR, MINOR = "LibCompress", 5
+local MAJOR, MINOR = "LibCompress", 6
 	
 local LibCompress,oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
@@ -908,32 +908,39 @@ end
 
 -- The encoded data holds values from 0 to 127 inclusive. Additional encoding may be necessary.
 -- This algorithm isn't exactly fast and be used with care and consideration
+
+tables.encode7bit = {}
+
 function LibCompress:Encode7bit(str)
-	local compressed_size = 0
 	local remainder = 0;
 	local remainder_length = 0;
-	local tbl = {}
+	local tbl = tables.encode7bit
+	local encoded_size = 0
 	local l=#str
-	--local function addBits(tbl, code, len)
 	for i=1,l do
 		code = string.byte(str, i)
 		remainder = remainder + bit_lshift(code, remainder_length)
 		remainder_length = 8 + remainder_length
 		while remainder_length>=7 do
-			compressed_size = compressed_size + 1
-			tbl[compressed_size] = string_char(bit_band(remainder, 127))
+			encoded_size = encoded_size + 1
+			tbl[encoded_size] = string_char(bit_band(remainder, 127))
 			remainder = bit_rshift(remainder, 7)
 			remainder_length = remainder_length -7
 		end
 	end
 	if remainder_length>0 then
-		table.insert(tbl, string_char(remainder))
+		encoded_size = encoded_size + 1
+		tbl[encoded_size] = string_char(remainder)
 	end
-	return table.concat(tbl)
+	setCleanupTables("encode7bit")
+	return table.concat(tbl, "", 1, encoded_size)
 end
 
+tables.decode8bit = {}
+
 function LibCompress:Decode7bit(str)
-	local bit8 = {}
+	local bit8 = tables.decode8bit
+	local decoded_size = 0
 	local ch
 	local i=1
 	local bitfield_len=0
@@ -941,7 +948,8 @@ function LibCompress:Decode7bit(str)
 	local l=#str
 	while true do
 		if bitfield_len >=8 then
-			table.insert(bit8, string_char(bit.band(bitfield, 255)))
+			decoded_size = decoded_size + 1
+			bit8[decoded_size] = string_char(bit.band(bitfield, 255))
 			bitfield = bit_rshift(bitfield, 8)
 			bitfield_len = bitfield_len - 8
 		end
@@ -953,7 +961,8 @@ function LibCompress:Decode7bit(str)
 		end
 		i=i+1
 	end
-	return table.concat(bit8)
+	setCleanupTables("decode8bit")
+	return table.concat(bit8, "", 1, decoded_size)
 end
 
 ----------------------------------------------------------------------
