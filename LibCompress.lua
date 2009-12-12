@@ -8,7 +8,7 @@
 ----------------------------------------------------------------------------------
 
 
-local MAJOR, MINOR = "LibCompress", 6
+local MAJOR, MINOR = "LibCompress", 7
 	
 local LibCompress,oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
@@ -22,6 +22,13 @@ if not LibCompress then return end
 
 
 -- local is faster than global
+local CreateFrame = CreateFrame
+local type = type
+local select = select
+local next = next
+local loadstring = loadstring
+local setmetatable = setmetatable
+local assert = assert
 local table_insert = table.insert
 local table_remove = table.remove
 local table_concat = table.concat
