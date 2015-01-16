@@ -1,6 +1,6 @@
 ----------------------------------------------------------------------------------
 --
--- LibCompress-1.0.lua
+-- LibCompress.lua
 --
 -- Authors: jjsheets and Galmok of European Stormrage (Horde)
 -- Email : sheets.jeff@gmail.com and galmok@gmail.com
@@ -10,7 +10,7 @@
 ----------------------------------------------------------------------------------
 
 
-local LibCompress = LibStub:NewLibrary("LibCompress-1.0", 90000 + tonumber(("$Revision$"):match("%d+")))
+local LibCompress = LibStub:NewLibrary("LibCompress", 90000 + tonumber(("$Revision$"):match("%d+")))
 
 if not LibCompress then return end
 

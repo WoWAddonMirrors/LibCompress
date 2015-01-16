@@ -1,6 +1,6 @@
 ﻿## Interface: 60000
 
-## Title: Lib: Compress-1.0
+## Title: Lib: Compress
 ## Notes: Compression and Decompression library
 ## Author: JJSheets and Galmok at Stormrage-EU (Horde)
 ## Version: @project-version@
