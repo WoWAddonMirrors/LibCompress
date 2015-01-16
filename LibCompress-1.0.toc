@@ -1,0 +1,12 @@
+﻿## Interface: 60000
+
+## Title: Lib: Compress-1.0
+## Notes: Compression and Decompression library
+## Author: JJSheets and Galmok at Stormrage-EU (Horde)
+## Version: @project-version@
+## X-Website: http://www.wowace.com/addons/libcompress/
+## X-Category: Library
+## X-eMail: sheets DOT jeff AT gmail DOT com, galmok AT gmail DOT com
+## X-License: LGPL v2.1
+
+lib.xml
