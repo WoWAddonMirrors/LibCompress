@@ -8,7 +8,7 @@
 ----------------------------------------------------------------------------------
 
 
-local LibCompress = LibStub:NewLibrary("LibCompress-1.0", 90000 + tonumber(string.match("%d+", "$Revision: 1$")))
+local LibCompress = LibStub:NewLibrary("LibCompress-1.0", 90000 + @project-revision@)
 
 if not LibCompress then return end
 
