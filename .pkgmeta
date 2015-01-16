@@ -1,4 +1,4 @@
-package-as: LibCompress-1.0
+package-as: LibCompress
 
 enable-nolib-creation: no
 
