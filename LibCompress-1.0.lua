@@ -5,10 +5,12 @@
 -- Authors: jjsheets and Galmok of European Stormrage (Horde)
 -- Email : sheets.jeff@gmail.com and galmok@gmail.com
 -- Licence: GPL version 2 (General Public License)
+-- Revision: $Revision$
+-- Date: $Date$
 ----------------------------------------------------------------------------------
 
 
-local LibCompress = LibStub:NewLibrary("LibCompress-1.0", 90000 + @project-revision@)
+local LibCompress = LibStub:NewLibrary("LibCompress-1.0", 90000 + tonumber(("$Revision$"):match("%d+")))
 
 if not LibCompress then return end
 
@@ -428,9 +430,9 @@ function LibCompress:CompressHuffman(uncompressed)
 	-- max 2^24 bytes
 	local length = string_len(uncompressed)
 	compressed[2] = string_char(bit_band(nLeafs -1, 255))	-- number of leafs
-	compressed[3] = string_char(bit_band(l, 255))			-- bit 0-7
-	compressed[4] = string_char(bit_band(bit_rshift(l, 8), 255))	-- bit 8-15
-	compressed[5] = string_char(bit_band(bit_rshift(l, 16), 255))	-- bit 16-23
+	compressed[3] = string_char(bit_band(length, 255))			-- bit 0-7
+	compressed[4] = string_char(bit_band(bit_rshift(length, 8), 255))	-- bit 8-15
+	compressed[5] = string_char(bit_band(bit_rshift(length, 16), 255))	-- bit 16-23
 	compressed_size = 5
 	
 	-- create symbol/code map
