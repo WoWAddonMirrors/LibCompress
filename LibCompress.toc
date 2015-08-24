@@ -9,4 +9,5 @@
 ## X-eMail: sheets DOT jeff AT gmail DOT com, galmok AT gmail DOT com
 ## X-License: LGPL v2.1
 
+LibStub\LibStub.lua
 lib.xml
