@@ -275,19 +275,41 @@ local compressed_size = 0
 local remainder
 local remainder_length
 local function addBits(tbl, code, length)
+	if remainder_length+length >= 32 then
+		-- we have at least 4 bytes to store; bulk it
+		remainder = remainder + bit_lshift(code, remainder_length) -- this overflows! Top part of code is lost (but we handle it below)
+		-- remainder now holds 4 full bytes to store. So lets do it.
+		compressed_size = compressed_size + 1
+		tbl[compressed_size] = string_char(bit_band(remainder, 255)) .. 
+			string_char(bit_band(bit_rshift(remainder, 8), 255)) ..
+			string_char(bit_band(bit_rshift(remainder, 16), 255)) ..
+			string_char(bit_band(bit_rshift(remainder, 24), 255))
+		remainder = 0
+		code = bit_rshift(code, 32 - remainder_length)
+		length =  remainder_length + length - 32
+		remainder_length = 0
+	end
+	if remainder_length+length >= 16 then
+		-- we have at least 2 bytes to store; bulk it
+		remainder = remainder + bit_lshift(code, remainder_length)
+		remainder_length = length + remainder_length
+		-- remainder now holds at least 2 full bytes to store. So lets do it.
+		compressed_size = compressed_size + 1
+		tbl[compressed_size] = string_char(bit_band(remainder, 255)) .. string_char(bit_band(bit_rshift(remainder, 8), 255))
+		remainder = bit_rshift(remainder, 16)
+		code = remainder
+		length = remainder_length - 16
+		remainder = 0
+		remainder_length = 0
+	end
 	remainder = remainder + bit_lshift(code, remainder_length)
 	remainder_length = length + remainder_length
-	if remainder_length > 32 then
-		return nil, "addBits overflow ("..remainder_length..")"
-	end
-	
-	while remainder_length >= 8 do
+	if remainder_length >= 8 then
 		compressed_size = compressed_size + 1
 		tbl[compressed_size] = string_char(bit_band(remainder, 255))
 		remainder = bit_rshift(remainder, 8)
 		remainder_length = remainder_length -8
 	end
-	return true
 end
 
 -- word size for this huffman algorithm is 8 bits (1 byte). This means the best compression is representing 1 byte with 1 bit, i.e. compress to 0.125 of original size.
@@ -440,23 +462,16 @@ function LibCompress:CompressHuffman(uncompressed)
 	compressed[4] = string_char(bit_band(bit_rshift(length, 8), 255))	-- bit 8-15
 	compressed[5] = string_char(bit_band(bit_rshift(length, 16), 255))	-- bit 16-23
 	compressed_size = 5
-	
+
 	-- create symbol/code map
 	local escaped_code, escaped_code_len, success, msg
 	for symbol, leaf in pairs(symbols) do
-		success, msg = addBits(compressed, symbol, 8)
-		if not success then
-			return nil, msg
-		end
+		addBits(compressed, symbol, 8)
 		escaped_code, escaped_code_len = escape_code(leaf.bcode, leaf.blength)
 		if not escaped_code then
 			return nil, escaped_code_len
 		end
-		success, msg = addBits(compressed, escaped_code, escaped_code_len)
-		if not success then
-			-- code word too long. Needs new revision to be able to handle more than 32 bits
-			return nil, msg
-		end
+		addBits(compressed, escaped_code, escaped_code_len)
 		addBits(compressed, 3, 2)
 	end
 
@@ -469,10 +484,7 @@ function LibCompress:CompressHuffman(uncompressed)
 		
 		for sub_i = i, ulimit do
 			c = string_byte(uncompressed, sub_i)
-			success, msg = addBits(compressed, symbols[c].bcode, symbols[c].blength)
-			if not success then
-				return nil, msg
-			end
+			addBits(compressed, symbols[c].bcode, symbols[c].blength)
 		end
 		
 		large_compressed_size = large_compressed_size + 1
