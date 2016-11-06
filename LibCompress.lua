@@ -102,15 +102,12 @@ local function encode(x)
 		bytes[k] = nil
 	end
 	
-	local xmod
-	x, xmod = math_modf(x / 255)
-	xmod = xmod * 255
-	bytes[#bytes + 1] = xmod
+	bytes[#bytes + 1] = x % 255
+	x=math.floor(x/255)
 	
 	while x > 0 do
-		x, xmod = math_modf(x / 255)
-		xmod = xmod * 255
-		bytes[#bytes + 1] = xmod
+		bytes[#bytes + 1] = x % 255
+		x=math.floor(x/255)
 	end
 	if #bytes == 1 and bytes[1] > 0 and bytes[1] < 250 then
 		return string_char(bytes[1])
