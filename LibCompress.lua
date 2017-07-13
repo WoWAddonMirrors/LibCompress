@@ -654,7 +654,7 @@ function LibCompress:DecompressHuffman(compressed)
 	local c, cl
 	local minCodeLen = 1000
 	local maxCodeLen = 0
-	local symbol, code_high, code, code_len, temp_high, temp
+	local symbol, code_high, code, code_len, temp_high, temp, _bitfield_high, _bitfield, _bitfield_len
 	local n = 0
 	local state = 0 -- 0 = get symbol (8 bits),  1 = get code (varying bits, ends with 2 bits set)
 	while n < num_symbols do
