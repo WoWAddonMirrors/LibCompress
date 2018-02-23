@@ -142,7 +142,7 @@ end
 -- the returned string will only contain "\000" characters in rare circumstances, and will contain none if the
 -- source string has none.
 local dict = {}
-function LibCompress:CompressLZW(uncompressed)
+function LibCompress.CompressLZW(uncompressed)
 	if type(uncompressed) == "string" then
 		local dict_size = 256
 		for k in pairs(dict) do
@@ -191,7 +191,7 @@ end
 -- if the passed string is a compressed string, this will decompress it and return the decompressed string.
 -- Otherwise it return an error message
 -- compressed strings are marked by beginning with "\002"
-function LibCompress:DecompressLZW(compressed)
+function LibCompress.DecompressLZW(compressed)
 	if type(compressed) == "string" then
 		if compressed:sub(1, 1) ~= "\002" then
 			return nil, "Can only decompress LZW compressed data ("..tostring(compressed:sub(1, 1))..")"
@@ -309,7 +309,8 @@ local function addBits(tbl, code, length)
 	end
 end
 
--- word size for this huffman algorithm is 8 bits (1 byte). This means the best compression is representing 1 byte with 1 bit, i.e. compress to 0.125 of original size.
+-- word size for this huffman algorithm is 8 bits (1 byte).
+-- this means the best compression is representing 1 byte with 1 bit, i.e. compress to 0.125 of original size.
 function LibCompress.CompressHuffman(uncompressed)
 	if type(uncompressed) ~= "string" then
 		return nil, "Can only compress strings"
@@ -320,7 +321,6 @@ function LibCompress.CompressHuffman(uncompressed)
 
 	-- make histogram
 	local hist = {}
-	local n = 0
 	-- don't have to use all data to make the histogram
 	local uncompressed_size = string_len(uncompressed)
 	local c
@@ -339,7 +339,8 @@ function LibCompress.CompressHuffman(uncompressed)
 		table_insert(leafs, leaf)
 	end
 
-	--Enqueue all leaf nodes into the first queue (by probability in increasing order so that the least likely item is in the head of the queue).
+	-- Enqueue all leaf nodes into the first queue (by probability in increasing order,
+	-- so that the least likely item is in the head of the queue).
 	sort(leafs, function(a, b)
 		if a.weight < b.weight then
 			return true
@@ -453,7 +454,7 @@ function LibCompress.CompressHuffman(uncompressed)
 
 	-- Header: byte 0 = #leafs, bytes 1-3 = size of uncompressed data
 	-- max 2^24 bytes
-	local length = string_len(uncompressed)
+	length = string_len(uncompressed)
 	compressed[2] = string_char(bit_band(nLeafs -1, 255))	-- number of leafs
 	compressed[3] = string_char(bit_band(length, 255))			-- bit 0-7
 	compressed[4] = string_char(bit_band(bit_rshift(length, 8), 255))	-- bit 8-15
@@ -706,7 +707,6 @@ function LibCompress.DecompressHuffman(compressed)
 	local large_uncompressed_size = 0
 	local test_code
 	local test_code_len = minCodeLen
-	local symbol
 	local dec_size = 0
 	compressed_size = compressed_size + 1
 	local temp_limit = 200 -- first limit of uncompressed data. large_uncompressed will hold strings of length 200
@@ -909,7 +909,7 @@ function LibCompress.GetEncodeTable(reservedChars, escapeChars, mapChars)
 	local decode_search = {}
 	local decode_translate = {}
 	local decode_func
-	local c, r, i, to, from
+	local c, r, to, from
 	local escapeCharIndex, escapeChar = 0
 
 	-- map single byte to single byte
@@ -1023,7 +1023,6 @@ function LibCompress:GetChatEncodeTable(reservedChars, escapeChars, mapChars)
 	-- 0% (average with pure ascii text)
 	-- 53.5% (average with random data valued zero to 255)
 	-- 100% (only encoding data that encodes to two bytes)
-	local i
 	local r = {}
 
 	for i = 128, 255 do
@@ -1177,7 +1176,6 @@ function LibCompress.fcs16init()
 end
 
 function LibCompress.fcs16update(uFcs16, pBuffer)
-	local i
 	local length = string_len(pBuffer)
 	for i = 1, length do
 		uFcs16 = bit_bxor(bit_rshift(uFcs16,8), fcs16tab[bit_band(bit_bxor(uFcs16, string_byte(pBuffer, i)), 255)])
@@ -1246,7 +1244,6 @@ function LibCompress.fcs32init()
 end
 
 function LibCompress.fcs32update(uFcs32, pBuffer)
-	local i
 	local length = string_len(pBuffer)
 	for i = 1, length do
 		uFcs32 = bit_bxor(bit_rshift(uFcs32, 8), fcs32tab[bit_band(bit_bxor(uFcs32, string_byte(pBuffer, i)), 255)])
