@@ -142,7 +142,7 @@ end
 -- the returned string will only contain "\000" characters in rare circumstances, and will contain none if the
 -- source string has none.
 local dict = {}
-function LibCompress.CompressLZW(uncompressed)
+function LibCompress:CompressLZW(uncompressed)
 	if type(uncompressed) == "string" then
 		local dict_size = 256
 		for k in pairs(dict) do
@@ -191,7 +191,7 @@ end
 -- if the passed string is a compressed string, this will decompress it and return the decompressed string.
 -- Otherwise it return an error message
 -- compressed strings are marked by beginning with "\002"
-function LibCompress.DecompressLZW(compressed)
+function LibCompress:DecompressLZW(compressed)
 	if type(compressed) == "string" then
 		if compressed:sub(1, 1) ~= "\002" then
 			return nil, "Can only decompress LZW compressed data ("..tostring(compressed:sub(1, 1))..")"
@@ -311,7 +311,7 @@ end
 
 -- word size for this huffman algorithm is 8 bits (1 byte).
 -- this means the best compression is representing 1 byte with 1 bit, i.e. compress to 0.125 of original size.
-function LibCompress.CompressHuffman(uncompressed)
+function LibCompress:CompressHuffman(uncompressed)
 	if type(uncompressed) ~= "string" then
 		return nil, "Can only compress strings"
 	end
@@ -613,7 +613,7 @@ end
 tables.Huffman_uncompressed = {}
 tables.Huffman_large_uncompressed = {} -- will always be as big as the largest string ever decompressed. Bad, but clearing it every time takes precious time.
 
-function LibCompress.DecompressHuffman(compressed)
+function LibCompress:DecompressHuffman(compressed)
 	if not type(compressed) == "string" then
 		return nil, "Can only uncompress strings"
 	end
@@ -760,14 +760,14 @@ end
 --------------------------------------------------------------------------------
 -- Generic codec interface
 
-function LibCompress.Store(uncompressed)
+function LibCompress:Store(uncompressed)
 	if type(uncompressed) ~= "string" then
 		return nil, "Can only compress strings"
 	end
 	return "\001"..uncompressed
 end
 
-function LibCompress.DecompressUncompressed(data)
+function LibCompress:DecompressUncompressed(data)
 	if type(data) ~= "string" then
 		return nil, "Can only handle strings"
 	end
@@ -870,7 +870,7 @@ local function escape_for_gsub(str)
 	return str:gsub("([%z%(%)%.%%%+%-%*%?%[%]%^%$])",  gsub_escape_table)
 end
 
-function LibCompress.GetEncodeTable(reservedChars, escapeChars, mapChars)
+function LibCompress:GetEncodeTable(reservedChars, escapeChars, mapChars)
 	reservedChars = reservedChars or ""
 	escapeChars = escapeChars or ""
 	mapChars = mapChars or ""
@@ -1049,7 +1049,7 @@ end
 
 tables.encode7bit = {}
 
-function LibCompress.Encode7bit(str)
+function LibCompress:Encode7bit(str)
 	local remainder = 0
 	local remainder_length = 0
 	local tbl = tables.encode7bit
@@ -1077,7 +1077,7 @@ end
 
 tables.decode8bit = {}
 
-function LibCompress.Decode7bit(str)
+function LibCompress:Decode7bit(str)
 	local bit8 = tables.decode8bit
 	local decoded_size = 0
 	local ch
@@ -1171,11 +1171,11 @@ local fcs16tab = { [0]=0, 4489, 8978, 12955, 17956, 22445, 25910, 29887,
 	63375, 58886, 54429, 50452, 45483, 40994, 37561, 33584,
 	31687, 27214, 22741, 18780, 15843, 11370, 7921, 3960 }
 
-function LibCompress.fcs16init()
+function LibCompress:fcs16init()
 	return FCSINIT16
 end
 
-function LibCompress.fcs16update(uFcs16, pBuffer)
+function LibCompress:fcs16update(uFcs16, pBuffer)
 	local length = string_len(pBuffer)
 	for i = 1, length do
 		uFcs16 = bit_bxor(bit_rshift(uFcs16,8), fcs16tab[bit_band(bit_bxor(uFcs16, string_byte(pBuffer, i)), 255)])
@@ -1183,7 +1183,7 @@ function LibCompress.fcs16update(uFcs16, pBuffer)
 	return uFcs16
 end
 
-function LibCompress.fcs16final(uFcs16)
+function LibCompress:fcs16final(uFcs16)
 	return bit_bxor(uFcs16,65535)
 end
 -- END OF FCS16
@@ -1239,11 +1239,11 @@ local fcs32tab = { [0] = 0, 1996959894, -301047508, -1727442502, 124634137, 1886
 	-1111625188, -893730166, 1404277552, 615818150, -1160759803, -841546093, 1423857449, 601450431,
 	-1285129682, -1000256840, 1567103746, 711928724, -1274298825, -1022587231, 1510334235, 755167117 }
 
-function LibCompress.fcs32init()
+function LibCompress:fcs32init()
 	return FCSINIT32
 end
 
-function LibCompress.fcs32update(uFcs32, pBuffer)
+function LibCompress:fcs32update(uFcs32, pBuffer)
 	local length = string_len(pBuffer)
 	for i = 1, length do
 		uFcs32 = bit_bxor(bit_rshift(uFcs32, 8), fcs32tab[bit_band(bit_bxor(uFcs32, string_byte(pBuffer, i)), 255)])
@@ -1251,6 +1251,6 @@ function LibCompress.fcs32update(uFcs32, pBuffer)
 	return uFcs32
 end
 
-function LibCompress.fcs32final(uFcs32)
+function LibCompress:fcs32final(uFcs32)
 	return bit_bnot(uFcs32)
 end
